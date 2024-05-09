@@ -5,10 +5,11 @@ const PostModel = mongoose.model("PostModel");
 const protectedRoute = require("../middleware/protectedResource");
 
 //all users posts
-router.get("/allposts", (req, res) => {
+router.get("/api/allposts", (req, res) => {
     PostModel.find()
+        .sort({ createdAt: -1 })
         .populate("author", "_id fullName profileImg username")
-        .populate("comments.commentedBy", "_id fullName username")
+        .populate("comments.commentedBy", "_id fullName username profileImg")
         .then((dbPosts) => {
             res.status(200).json({ posts: dbPosts })
         })
@@ -18,7 +19,7 @@ router.get("/allposts", (req, res) => {
 });
 
 //all posts only from logged in user
-router.get("/myallposts", protectedRoute, (req, res) => {
+router.get("/api/myallposts", protectedRoute, (req, res) => {
     PostModel.find({ author: req.user._id })
         .populate("author", "_id fullName profileImg")
         .then((dbPosts) => {
@@ -30,16 +31,18 @@ router.get("/myallposts", protectedRoute, (req, res) => {
 });
 
 // create post 
-router.post("/createpost", protectedRoute, (req, res) => {
+router.post("/api/createpost", protectedRoute, (req, res) => {
     const { description, location, image } = req.body;
-    if (!description ) {
+    if (!description) {
         return res.status(400).json({ error: "One or more mandatory fields are empty" });
     }
     req.user.password = undefined;
-    const postObj = new PostModel({ description: description, 
-        location: location, 
-        image: image, 
-        author: req.user });
+    const postObj = new PostModel({
+        description: description,
+        location: location,
+        image: image,
+        author: req.user
+    });
     postObj.save()
         .then((newPost) => {
             res.status(201).json({ post: newPost });
@@ -49,8 +52,8 @@ router.post("/createpost", protectedRoute, (req, res) => {
         })
 });
 
-
-router.delete("/deletepost/:postId", protectedRoute, async (req, res) => {
+// Delete Post
+router.delete("/api/deletepost/:postId", protectedRoute, async (req, res) => {
     try {
         const postFound = await PostModel.findOne({ _id: req.params.postId }).populate("author", "_id");
         if (!postFound) {
@@ -74,8 +77,8 @@ router.delete("/deletepost/:postId", protectedRoute, async (req, res) => {
     }
 });
 
-//  
-router.put("/likeordislike",protectedRoute, async (req, res) => {
+//  like and dislike 
+router.put("/api/likeordislike", protectedRoute, async (req, res) => {
     try {
         const loggedInUserId = req.user.id;
         const tweetId = req.body.postId;
@@ -100,8 +103,8 @@ router.put("/likeordislike",protectedRoute, async (req, res) => {
 
 
 
-
-router.put("/comment", protectedRoute, async (req, res) => {
+// Comment on post
+router.put("/api/comment", protectedRoute, async (req, res) => {
     try {
         const comment = { commentText: req.body.commentText, commentedBy: req.user._id };
         const result = await PostModel.findByIdAndUpdate(req.body.postId, {
@@ -109,7 +112,7 @@ router.put("/comment", protectedRoute, async (req, res) => {
         }, {
             new: true // returns updated record
         }).populate("comments.commentedBy", "_id fullName") // comment owner
-          .populate("author", "_id fullName"); // post owner
+            .populate("author", "_id fullName"); // post owner
 
         res.json(result);
     } catch (error) {
